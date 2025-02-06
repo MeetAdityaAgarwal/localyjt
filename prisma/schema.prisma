@@ -1,0 +1,151 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("TEST_DATABASE_URL")
+}
+
+model User {
+  id                String       @id @default(uuid())
+  email             String       @unique
+  password          String
+  role              UserRole
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+  balance           Float        @default(0)
+  manager           User?        @relation("RiderToManager", fields: [managerId], references: [id])
+  managerId         String?
+  riders            User[]       @relation("RiderToManager")
+  collections       Collection[]
+  transfers         Transfer[]
+  historyAccess     Int?         @default(30) // Days of history managers can see
+  collectionAccess  Int?         @default(7)  // Days of collection history riders can see
+  
+  @@map("users")
+}
+
+enum UserRole {
+  ADMIN
+  MANAGER
+  RIDER
+}
+
+model Customer {
+  id            String       @id @default(uuid())
+  name          String
+  balance       Float        @default(0)
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+  invoices      Invoice[]
+  collections   Collection[]
+  creditScore   Int          @default(100)    // Score from 0-100
+  lastPayment   DateTime?
+  riskLevel     RiskLevel    @default(LOW)
+  riskHistories CustomerRiskHistory[]
+  @@map("customers")
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+model Invoice {
+  id          String        @id @default(uuid())
+  customerId  String
+  customer    Customer      @relation(fields: [customerId], references: [id])
+  amount      Float
+  status      InvoiceStatus
+  items       InvoiceItem[]
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  dueDate     DateTime
+  
+  @@map("invoices")
+}
+
+model InvoiceItem {
+  id          String    @id @default(uuid())
+  invoiceId   String
+  invoice     Invoice   @relation(fields: [invoiceId], references: [id])
+  name        String
+  quantity    Int
+  price       Float
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  
+  @@map("invoice_items")
+}
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  CANCELLED
+  OVERDUE
+}
+
+model Collection {
+  id          String           @id @default(uuid())
+  riderId     String
+  rider       User             @relation(fields: [riderId], references: [id])
+  customerId  String
+  customer    Customer         @relation(fields: [customerId], references: [id])
+  amount      Float
+  status      CollectionStatus
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  
+  @@map("collections")
+}
+
+enum CollectionStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  REFUSED
+}
+
+model CustomerRiskHistory {
+  id          String     @id @default(uuid())
+  customerId  String
+  riskLevel   RiskLevel
+  riskScore   Int
+  createdAt   DateTime   @default(now())
+
+  customer    Customer   @relation(fields: [customerId], references: [id])
+
+  @@map("customer_risk_history")
+}
+
+
+model Transfer {
+  id          String         @id @default(uuid())
+  fromUserId  String
+  fromUser    User           @relation(fields: [fromUserId], references: [id])
+  amount      Float
+  status      TransferStatus
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  
+  @@map("transfers")
+}
+
+enum TransferStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model AuditLog {
+  id          String    @id @default(uuid())
+  userId      String
+  action      String
+  details     String
+  createdAt   DateTime  @default(now())
+  
+  @@map("audit_logs")
+}
